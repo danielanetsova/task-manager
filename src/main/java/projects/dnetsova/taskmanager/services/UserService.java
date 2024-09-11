@@ -28,13 +28,12 @@ public class UserService {
      * @throws DuplicateUserException thrown if a user with the given name already exists
      */
     public void addUser(String name) throws DuplicateUserException {
-            try {
+        try {
             User user = new User(name);
             this.userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateUserException(name);
         }
-
     }
 
     /**
@@ -62,7 +61,6 @@ public class UserService {
     public void updateUser(String name, String newName) throws InvalidUserException, DuplicateUserException {
         int updatedRows = 0;
 
-        //TODO: updateUser да връща int ако е нула invalidUser, ако не е duplicateUserException
         try {
             updatedRows = this.userRepository.updateUserName(name, newName);
         } catch (DataIntegrityViolationException e) {
@@ -80,11 +78,9 @@ public class UserService {
      * @return CustomPage<String> - object which specifies and simplifies
      * pagination information. Contains List of username String objects,
      * number of total pages and number of total elements.
-     * @throws IllegalArgumentException when page and size are not positive.
+     * @throws IllegalArgumentException when page and/or size are not positive.
      */
-    public CustomPage<String> getAllUsers(int page, int size) throws IllegalArgumentException{
-//      Page<User> p = this.userRepository.findAll(PageRequest.of(page, size));
-
+    public CustomPage<String> getAllUsers(int page, int size) throws IllegalArgumentException {
         if (page <= 0) throw new IllegalArgumentException("Page must be greater than 0");
         if (size <= 0) throw new IllegalArgumentException("Size must be greater than 0");
 

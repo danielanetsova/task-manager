@@ -39,7 +39,7 @@ public class UserController {
             , example = "Fred") @RequestParam String name)  {
 
         if (nameIsNotValid(name)) {
-            return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body(new ApiResponse<>(null,
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(null,
                     new ApiError("InvalidName", "User name cannot be empty.")));
         }
 
