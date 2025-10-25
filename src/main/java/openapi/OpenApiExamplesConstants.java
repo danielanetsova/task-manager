@@ -107,4 +107,44 @@ public class OpenApiExamplesConstants {
                 ]
             }
             """;
+
+    public static final String GET_ALL_TASKS_SUCCESS = """
+            {
+                "content": {
+                    "elements": [
+                        {
+                            "id": "00000000-0000-0000-0000-000000000001",
+                            "title": "Task1",
+                            "description": "Task1 description",
+                            "priority": "P1",
+                            "start_time": "2007-12-03",
+                            "deadline": "2008-12-03",
+                            "repeat_time": "2009-12-03"
+                            "assignees": [
+                                "Any"
+                            ],
+                            "parent_task_id": "00000000-0000-0000-0000-000000000002",
+                            "is_completed": false
+                        },
+                        {
+                            "id": "00000000-0000-0000-0000-000000000003",
+                            "title": "Task2",
+                            "description": "Task2 description",
+                            "priority": "P2",
+                            "start_time": "2007-12-03",
+                            "deadline": "2007-12-31",
+                            "repeat_time": ""
+                            "assignees": [
+                                "Any"
+                            ],
+                            "parent_task_id": "00000000-0000-0000-0000-000000000004",
+                            "is_completed": true
+                        }
+                    ],
+                    "totalPageCount": 2,
+                    "totalElementsCount": 2
+                },
+                "errors": []
+            }
+            """;
 }

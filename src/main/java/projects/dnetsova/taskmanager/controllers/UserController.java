@@ -20,6 +20,7 @@ import projects.dnetsova.taskmanager.services.UserService;
 
 
 @RestController
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/users")
 public class UserController {
     private final UserService userService;
@@ -229,7 +230,6 @@ public class UserController {
                     )
             )
     })
-
     @GetMapping("/get")
     public ResponseEntity<ApiResponse<CustomPage<String>>> getUsersPage(
             @Parameter(description = "Page number", example = "1")
@@ -251,7 +251,7 @@ public class UserController {
                 new ApiError("MissingRequestParameter", ex.getMessage())));
     }
 
-    private boolean     nameIsNotValid(String name) {
+    private boolean nameIsNotValid(String name) {
         return name == null || name.isBlank();
     }
 }

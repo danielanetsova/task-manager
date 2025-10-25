@@ -85,6 +85,6 @@ public class UserService {
         if (size <= 0) throw new IllegalArgumentException("Size must be greater than 0");
 
         Page<String> p = this.userRepository.findAllUserNames(PageRequest.of(page - 1, size));
-      return new CustomPage<>(p.getContent(), p.getTotalPages(), p.getTotalElements());
+        return new CustomPage<>(p.getContent(), p.getTotalPages(), p.getTotalElements());
     }
 }
