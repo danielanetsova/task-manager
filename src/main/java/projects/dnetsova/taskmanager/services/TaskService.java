@@ -66,16 +66,18 @@ public class TaskService {
         );
     }
 
-    public CustomPage<Task> getTasks(Priority priority, String title, LocalDate deadline, Set<String> assignees,
-                                     int page, int size) {
+    public CustomPage<Task> getTasks(UUID parentTaskId, Priority priority, String title, LocalDate deadline,
+                                     Boolean isCompleted, Set<String> assignees, int page, int size) {
         if (page <= 0) throw new IllegalArgumentException("Page must be greater than 0");
         if (size <= 0) throw new IllegalArgumentException("Size must be greater than 0");
 
         Page<projects.dnetsova.taskmanager.entities.Task> taskEntities =
                 this.taskRepository.getTasksFiltered(
+                        parentTaskId,
                         priority,
                         title,
                         deadline,
+                        isCompleted,
                         assignees,
                         (long) assignees.size(),
                         PageRequest.of(page - 1, size)

@@ -16,23 +16,54 @@ import java.util.UUID;
 @Repository
 public interface TaskRepository extends JpaRepository<Task, UUID> {
 
-    @Query("""
-        SELECT t
-        FROM Task t
-        LEFT JOIN t.assignees a
-        WHERE (:priority IS NULL OR t.priority = :priority)
-          AND (:title IS NULL OR LOWER(t.title) LIKE LOWER(CONCAT('%', :title, '%')))
-          AND (:deadline IS NULL OR t.deadline <= :deadline)
-          AND (:assigneesSize IS NULL OR :assigneesSize = 0 OR a.name IN :assignees)
-        GROUP BY t
-        HAVING (:assigneesSize IS NULL OR :assigneesSize = 0
-                OR COUNT(DISTINCT a.name) = :assigneesSize)
-        ORDER BY t.priority ASC, t.deadline ASC NULLS LAST
-    """)
+    @Query(value = """
+                SELECT t
+                FROM Task t
+                WHERE (:priority IS NULL OR t.priority = :priority)
+                  AND (:title IS NULL OR LOWER(t.title) LIKE LOWER(CONCAT('%', :title, '%')))
+                  AND (:deadline IS NULL OR t.deadline <= :deadline)
+                  AND (:isCompleted IS NULL OR t.isCompleted = :isCompleted)
+                  AND (
+                    (:parentTaskId IS NULL AND t.parentTaskId IS NULL)
+                    OR (:parentTaskId IS NOT NULL AND t.parentTaskId = :parentTaskId)
+                  )
+                  AND (
+                    :assigneesSize IS NULL OR :assigneesSize = 0 OR
+                    (SELECT COUNT(DISTINCT a.name)
+                     FROM t.assignees a
+                     WHERE a.name IN :assignees
+                    ) = :assigneesSize
+                  )
+                ORDER BY
+                  t.priority ASC,
+                  CASE WHEN t.deadline IS NULL THEN 1 ELSE 0 END ASC,
+                  t.deadline ASC
+            """,
+            countQuery = """
+                        SELECT COUNT(t)
+                        FROM Task t
+                        WHERE (:priority IS NULL OR t.priority = :priority)
+                          AND (:title IS NULL OR LOWER(t.title) LIKE LOWER(CONCAT('%', :title, '%')))
+                          AND (:deadline IS NULL OR t.deadline <= :deadline)
+                          AND (:isCompleted IS NULL OR t.isCompleted = :isCompleted)
+                          AND (
+                            (:parentTaskId IS NULL AND t.parentTaskId IS NULL)
+                            OR (:parentTaskId IS NOT NULL AND t.parentTaskId = :parentTaskId)
+                          )
+                          AND (
+                            :assigneesSize IS NULL OR :assigneesSize = 0 OR
+                            (SELECT COUNT(DISTINCT a.name)
+                             FROM t.assignees a
+                             WHERE a.name IN :assignees
+                            ) = :assigneesSize
+                          )
+                    """)
     Page<Task> getTasksFiltered(
+            @Param("parentTaskId") UUID parentTaskId,
             @Param("priority") Priority priority,
             @Param("title") String title,
             @Param("deadline") LocalDate deadline,
+            @Param("isCompleted") Boolean isCompleted,
             @Param("assignees") Set<String> assignees,
             @Param("assigneesSize") Long assigneesSize,
             Pageable pageable

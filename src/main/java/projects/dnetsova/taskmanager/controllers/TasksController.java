@@ -81,16 +81,20 @@ public class TasksController {
             @RequestParam(required = false) String title,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deadline,
+            @RequestParam(required = false) Boolean isCompleted,
             @RequestParam(required = false) Set<String> assignees,
+            @RequestParam(required = false) UUID parentTaskId,
             @Parameter(description = "Page number", example = "1")
             @RequestParam(required = false, defaultValue = "1") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(required = false, defaultValue = "10") int size) {
         try {
             CustomPage<Task> tasks = taskService.getTasks(
+                    parentTaskId,
                     priority,
                     title,
                     deadline,
+                    isCompleted,
                     assignees == null ? Collections.emptySet(): assignees,
                     page,
                     size
@@ -136,9 +140,12 @@ public class TasksController {
     @PostMapping("/create")
     public ResponseEntity<ApiResponse<Void>> createTask(
             @Parameter(description = "The task details of the currently added task") @RequestBody Task task)  {
-        taskService.addTask(task);
-
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        try {
+            taskService.addTask(task);
+            return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(null, new ApiError(e)));
+        }
     }
 
     @GetMapping("/{id}")
@@ -147,12 +154,17 @@ public class TasksController {
         return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>(task));
     }
 
+    //TODO: More error handling
     @PatchMapping("/{id}")
-    public ResponseEntity<Task> updateTask(
+    public ResponseEntity<ApiResponse<Void>> updateTask(
             @PathVariable UUID id,
             @RequestBody TaskUpdate update
     ) {
-        taskService.updateTask(id, update);
-        return ResponseEntity.status(HttpStatus.OK).build();
+        try {
+            taskService.updateTask(id, update);
+            return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>(null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(null, new ApiError(e)));
+        }
     }
 }
