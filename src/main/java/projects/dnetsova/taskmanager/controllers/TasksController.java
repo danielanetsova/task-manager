@@ -11,6 +11,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -165,6 +166,39 @@ public class TasksController {
             return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>(null));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(null, new ApiError(e)));
+        }
+    }
+
+    @Operation(summary = "Delete task", description = "A task with the given ID is deleted.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+                    description = "Task deleted successfully.",
+                    content = @Content(examples = @ExampleObject(
+                            name = "Response content",
+                            summary = "Response content",
+                            description = "Successful task deletion response")
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "Task not found.",
+                    content = @Content(
+                            examples = @ExampleObject(
+                                    name = "Task not found",
+                                    summary = "Task not found",
+                                    description = "Task not found response"
+                            )
+                    )
+            )
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteTask(
+            @Parameter(description = "The ID of the task to be deleted") @PathVariable UUID id
+    ) {
+        try {
+            taskService.deleteTask(id);
+            return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>(null));
+        } catch (java.util.NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>(null, new ApiError(e)));
         }
     }
 }

@@ -91,6 +91,15 @@ public class TaskService {
     }
 
     @Transactional
+    public void deleteTask(UUID id) {
+        if (!taskRepository.existsById(id)) {
+            throw new NoSuchElementException("Task not found: " + id);
+        }
+
+        taskRepository.deleteTaskAndDirectChildren(id);
+    }
+
+    @Transactional
     public void updateTask(UUID id, TaskUpdate taskUpdate) {
         if (taskUpdate.getTitle() == null || taskUpdate.getPriority() == null || taskUpdate.getIsCompleted() == null) {
             throw new IllegalArgumentException("Title, priority and isCompleted cannot be set to null or empty");
