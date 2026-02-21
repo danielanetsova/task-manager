@@ -4,6 +4,9 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import projects.dnetsova.taskmanager.models.CustomPage;
 import projects.dnetsova.taskmanager.models.Task;
@@ -21,6 +24,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.completionDate;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.deadlineLte;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.hasAllAssigneesByName;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.isCompleted;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.parentTaskIdEq;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.priority;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.startDate;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.titleContainsIgnoreCase;
 
 @Service
 public class TaskService {
@@ -60,33 +72,57 @@ public class TaskService {
                 entity.getStartDate(),
                 entity.getDeadline(),
                 entity.getRepeatDate(),
+                entity.getCompletionDate(),
                 entity.getAssignees().stream().map(a -> a.getName()).toList(),
                 entity.getParentTaskId(),
                 entity.isCompleted()
         );
     }
 
-    public CustomPage<Task> getTasks(UUID parentTaskId, Priority priority, String title, LocalDate deadline,
-                                     Boolean isCompleted, Set<String> assignees, int page, int size) {
-        if (page <= 0) throw new IllegalArgumentException("Page must be greater than 0");
-        if (size <= 0) throw new IllegalArgumentException("Size must be greater than 0");
+    public CustomPage<Task> getTasks(
+            UUID parentTaskId,
+            Priority priority,
+            String title,
+            LocalDate startDate,
+            LocalDate deadline,
+            LocalDate completionDate,
+            Boolean isCompleted,
+            Set<String> assignees,
+            int page,
+            int size
+    ) {
+        Specification<projects.dnetsova.taskmanager.entities.Task> spec = Specification
+                .<projects.dnetsova.taskmanager.entities.Task>where(null)
+                .and(isCompleted(isCompleted))
+                .and(priority(priority))
+                .and(titleContainsIgnoreCase(title))
+                .and(isCompleted != null && isCompleted ? null : startDate(startDate))
+                .and(deadlineLte(deadline))
+                .and(completionDate(completionDate))
+                .and(parentTaskIdEq(parentTaskId))
+                .and(hasAllAssigneesByName(assignees));
 
-        Page<projects.dnetsova.taskmanager.entities.Task> taskEntities =
-                this.taskRepository.getTasksFiltered(
-                        parentTaskId,
-                        priority,
-                        title,
-                        deadline,
-                        isCompleted,
-                        assignees,
-                        (long) assignees.size(),
-                        PageRequest.of(page - 1, size)
-                );
+        Sort sort;
+        if (startDate != null) {
+            sort = Sort.by(Sort.Order.asc("startDate").nullsLast());
+        } else if (isCompleted != null && !isCompleted) {
+            // Sort by priority, then by formula (0=has deadline, 1=null) so nulls last, then by deadline
+            sort = Sort.by(
+                    Sort.Order.asc("priority"),
+                    Sort.Order.asc("deadlineNullsLastSort"),
+                    Sort.Order.asc("deadline")
+            );
+        } else {
+            sort = Sort.by(Sort.Order.asc("completionDate"));
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size, sort);
+        Page<projects.dnetsova.taskmanager.entities.Task> result = taskRepository.findAll(spec, pageable);
 
         return new CustomPage<>(
-                entitiesToModels(taskEntities.getContent()),
-                taskEntities.getTotalPages(),
-                taskEntities.getTotalElements()
+                entitiesToModels(result.getContent()),
+                result.getTotalPages(),
+                result.getTotalElements()
         );
     }
 
@@ -137,6 +173,10 @@ public class TaskService {
         applyUpdate(taskUpdate.getIsCompleted(),
                 entity::setCompleted);
 
+        if (taskUpdate.getIsCompleted().isPresent() && taskUpdate.getIsCompleted().get()) {
+            entity.setCompletionDate(LocalDate.now());
+        }
+
         taskRepository.saveAndFlush(entity);
     }
 
@@ -158,6 +198,7 @@ public class TaskService {
                 te.getStartDate(),
                 te.getDeadline(),
                 te.getRepeatDate(),
+                te.getCompletionDate(),
                 te.getAssignees().stream().map(a -> a.getName()).toList(),
                 te.getParentTaskId(),
                 te.isCompleted()

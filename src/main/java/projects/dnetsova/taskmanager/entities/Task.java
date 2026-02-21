@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -12,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Formula;
 import projects.dnetsova.taskmanager.utils.Priority;
 
 import java.time.LocalDate;
@@ -25,7 +27,7 @@ public class Task {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String title;
 
     @Column(columnDefinition = "TEXT")
@@ -37,13 +39,38 @@ public class Task {
     @Basic
     private LocalDate deadline;
 
+    /** Used only for ordering: 0 when deadline is set, 1 when null (sort ASC = nulls last). */
+    @Formula("(CASE WHEN deadline IS NULL THEN 1 ELSE 0 END)")
+    private Integer deadlineNullsLastSort;
+
     @Column(name = "repeat_date")
     private LocalDate repeatDate;
 
+    @Column(name = "completion_date")
+    private LocalDate completionDate;
+
     @ManyToMany
-    @JoinTable(name = "tasks_users",
-            joinColumns = @JoinColumn(name = "task_id", referencedColumnName = "id"),
-            inverseJoinColumns = @JoinColumn(name = "user_id", referencedColumnName = "id"))
+    @JoinTable(
+            name = "tasks_users",
+            joinColumns = @JoinColumn(
+                    name = "task_id",
+                    referencedColumnName = "id",
+                    foreignKey = @ForeignKey(
+                            name = "fk_tasks_users_task",
+                            foreignKeyDefinition =
+                                    "FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE"
+                    )
+            ),
+            inverseJoinColumns = @JoinColumn(
+                    name = "user_id",
+                    referencedColumnName = "id",
+                    foreignKey = @ForeignKey(
+                            name = "fk_tasks_users_user",
+                            foreignKeyDefinition =
+                                    "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+                    )
+            )
+    )
     private Set<User> assignees;
 
     @Column(nullable = false)
@@ -120,6 +147,10 @@ public class Task {
     public void setRepeatDate(LocalDate repeatDate) {
         this.repeatDate = repeatDate;
     }
+
+    public LocalDate getCompletionDate() { return completionDate; }
+
+    public void setCompletionDate(LocalDate completionDate) { this.completionDate = completionDate; }
 
     public Set<User> getAssignees() {
         return assignees;

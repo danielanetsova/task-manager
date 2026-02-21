@@ -11,6 +11,10 @@ import projects.dnetsova.taskmanager.exceptions.InvalidUserException;
 import projects.dnetsova.taskmanager.models.CustomPage;
 import projects.dnetsova.taskmanager.repositories.UserRepository;
 
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 @Service
 public class UserService {
     private final UserRepository userRepository;
@@ -37,15 +41,17 @@ public class UserService {
     }
 
     /**
-     * If a user with the given name is present in the database, this user is deleted,
-     * otherwise, an InvalidUserException is thrown.
-     * @param name the name of the user to be deleted.
-     * @throws InvalidUserException in case a user with the given name doesn't exist.
+     * Deletes a user with the given ID from the database.
+     * If no rows were modified (user doesn't exist), an InvalidUserException is thrown.
+     * @param id the ID of the user to be deleted.
+     * @throws InvalidUserException in case a user with the given ID doesn't exist.
      */
-    public void removeUser(String name) throws InvalidUserException {
-        int deletedRows = this.userRepository.delete(name);
-
-        if (deletedRows == 0) throw new InvalidUserException(name);
+    public void removeUser(UUID id) throws InvalidUserException {
+        int deletedRows = this.userRepository.deleteUserById(id);
+        
+        if (deletedRows == 0) {
+            throw new InvalidUserException(id);
+        }
     }
 
     /**
@@ -71,20 +77,23 @@ public class UserService {
     }
 
     /**
-     * Retrieves a Page of usernames according to
+     * Retrieves a Page of users according to
      * the given pagination information - page and size.
      * @param page The page index. The first page is 1.
      * @param size The number of items per page.
-     * @return CustomPage<String> - object which specifies and simplifies
-     * pagination information. Contains List of username String objects,
+     * @return CustomPage<User> - object which specifies and simplifies
+     * pagination information. Contains List of User objects with id and name,
      * number of total pages and number of total elements.
      * @throws IllegalArgumentException when page and/or size are not positive.
      */
-    public CustomPage<String> getAllUsers(int page, int size) throws IllegalArgumentException {
+    public CustomPage<projects.dnetsova.taskmanager.models.User> getAllUsers(int page, int size) throws IllegalArgumentException {
         if (page <= 0) throw new IllegalArgumentException("Page must be greater than 0");
         if (size <= 0) throw new IllegalArgumentException("Size must be greater than 0");
 
-        Page<String> p = this.userRepository.findAllUserNames(PageRequest.of(page - 1, size));
-        return new CustomPage<>(p.getContent(), p.getTotalPages(), p.getTotalElements());
+        Page<User> p = this.userRepository.findAll(PageRequest.of(page - 1, size));
+        List<projects.dnetsova.taskmanager.models.User> userModels = p.getContent().stream()
+                .map(user -> new projects.dnetsova.taskmanager.models.User(user.getId(), user.getName()))
+                .collect(Collectors.toList());
+        return new CustomPage<>(userModels, p.getTotalPages(), p.getTotalElements());
     }
 }

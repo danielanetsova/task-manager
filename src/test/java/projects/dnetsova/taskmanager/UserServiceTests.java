@@ -18,8 +18,10 @@ import projects.dnetsova.taskmanager.models.CustomPage;
 import projects.dnetsova.taskmanager.repositories.UserRepository;
 import projects.dnetsova.taskmanager.services.UserService;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -38,6 +40,7 @@ public class UserServiceTests {
     private final String name = "user";
     private final String newName = "newUser";
     private final User user = new User(name);
+    private final UUID userId = UUID.randomUUID();
 
     @Test
     public void addUserMustThrowDuplicateUserExceptionWhenUserNameExists() {
@@ -56,17 +59,17 @@ public class UserServiceTests {
 
     @Test
     public void removeUserMustThrowInvalidUserExceptionWhenUserNameDoesNotExist() {
-        Mockito.when(userRepository.delete(this.name)).thenReturn(0);
-        Assertions.assertThrows(InvalidUserException.class, () -> userService.removeUser(this.name),
-                "Expected InvalidUserException to be thrown when removing a user with a non-existing name.");
-        verify(userRepository).delete(this.name);
+        Mockito.when(userRepository.deleteUserById(this.userId)).thenReturn(0);
+        Assertions.assertThrows(InvalidUserException.class, () -> userService.removeUser(this.userId),
+                "Expected InvalidUserException to be thrown when removing a user with a non-existing ID.");
+        verify(userRepository).deleteUserById(this.userId);
     }
 
     @Test
-    public void removeUserMustDeleteTheUserByName() throws InvalidUserException {
-       Mockito.when(userRepository.delete(this.name)).thenReturn(1);
-        userService.removeUser(this.name);
-        verify(userRepository).delete(this.name);
+    public void removeUserMustDeleteTheUserById() throws InvalidUserException {
+       Mockito.when(userRepository.deleteUserById(this.userId)).thenReturn(1);
+        userService.removeUser(this.userId);
+        verify(userRepository).deleteUserById(this.userId);
     }
 
     @Test
@@ -98,7 +101,7 @@ public class UserServiceTests {
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> userService.getAllUsers(page, size),
                 "Expected IllegalArgumentException to be thrown when page is negative or zero.");
-        verify(userRepository, never()).findAllUserNames(any(PageRequest.class));
+        verify(userRepository, never()).findAll(any(PageRequest.class));
     }
 
     @Test
@@ -108,7 +111,7 @@ public class UserServiceTests {
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> userService.getAllUsers(page, size),
                 "Expected IllegalArgumentException to be thrown when size is negative or zero.");
-        verify(userRepository, never()).findAllUserNames(any(PageRequest.class));
+        verify(userRepository, never()).findAll(any(PageRequest.class));
     }
 
     @Test
@@ -116,18 +119,37 @@ public class UserServiceTests {
         int page = 2;
         int size = 3;
 
-        List<String> users = Arrays.asList("user", "user2", "user3");
-        Page<String> userPage = new PageImpl<>(users, PageRequest.of(page - 1, size), size);
+        UUID id1 = UUID.randomUUID();
+        UUID id2 = UUID.randomUUID();
+        UUID id3 = UUID.randomUUID();
+        List<User> userEntities = Arrays.asList(
+                new User("user"),
+                new User("user2"),
+                new User("user3")
+        );
+        
+        // Set IDs using reflection
+        try {
+            Field idField = User.class.getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(userEntities.get(0), id1);
+            idField.set(userEntities.get(1), id2);
+            idField.set(userEntities.get(2), id3);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to set user IDs for test", e);
+        }
+        
+        Page<User> userPage = new PageImpl<>(userEntities, PageRequest.of(page - 1, size), size);
 
-        Mockito.when(userRepository.findAllUserNames(PageRequest.of(page - 1, size))).thenReturn(userPage);
+        Mockito.when(userRepository.findAll(PageRequest.of(page - 1, size))).thenReturn(userPage);
 
-        CustomPage<String> resultCustomPage = userService.getAllUsers(page, size);
+        CustomPage<projects.dnetsova.taskmanager.models.User> resultCustomPage = userService.getAllUsers(page, size);
 
         Assertions.assertNotNull(resultCustomPage);
         Assertions.assertEquals(userPage.getTotalElements(), resultCustomPage.totalElementsCount());
         Assertions.assertEquals(userPage.getTotalPages(), resultCustomPage.totalPageCount());
-        Assertions.assertEquals("user", resultCustomPage.elements().get(0));
-        Assertions.assertEquals("user2", resultCustomPage.elements().get(1));
-        Assertions.assertEquals("user3", resultCustomPage.elements().get(2));
+        Assertions.assertEquals("user", resultCustomPage.elements().get(0).name());
+        Assertions.assertEquals("user2", resultCustomPage.elements().get(1).name());
+        Assertions.assertEquals("user3", resultCustomPage.elements().get(2).name());
     }
 }

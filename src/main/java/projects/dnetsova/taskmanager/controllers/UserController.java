@@ -16,7 +16,10 @@ import projects.dnetsova.taskmanager.exceptions.InvalidUserException;
 import projects.dnetsova.taskmanager.models.ApiError;
 import projects.dnetsova.taskmanager.models.ApiResponse;
 import projects.dnetsova.taskmanager.models.CustomPage;
+import projects.dnetsova.taskmanager.models.User;
 import projects.dnetsova.taskmanager.services.UserService;
+
+import java.util.UUID;
 
 
 @RestController
@@ -81,7 +84,7 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    @Operation(summary = "Remove user", description = "A user with the given name is removed.")
+    @Operation(summary = "Remove user", description = "A user with the given ID is removed.")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
                     description = "User removed successfully.",
@@ -92,15 +95,9 @@ public class UserController {
                 )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400", description = "Username empty/User does not exist.",
+                    responseCode = "400", description = "Invalid UUID/User does not exist.",
                     content = @Content(
                             examples = {
-                                    @ExampleObject(
-                                            name = "User name empty",
-                                            summary = "User name empty",
-                                            description = "User name empty response",
-                                            value = OpenApiExamplesConstants.INVALID_USER_NAME_ERROR
-                                    ),
                                     @ExampleObject(
                                             name = "User does not exist",
                                             summary = "User does not exist",
@@ -112,15 +109,18 @@ public class UserController {
             )
     })
     @DeleteMapping("/remove")
-    public ResponseEntity<ApiResponse<Void>> removeUser(@Parameter(description = "The name of the user to be removed",
-            example = "Fred") @RequestParam String name) {
-        if (nameIsNotValid(name)) {
+    public ResponseEntity<ApiResponse<Void>> removeUser(@Parameter(description = "The ID of the user to be removed",
+            example = "550e8400-e29b-41d4-a716-446655440000") @RequestParam String id) {
+        UUID userId;
+        try {
+            userId = UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(null,
-                    new ApiError("InvalidName", "User name cannot be empty.")));
+                    new ApiError("InvalidUUID", "Invalid user ID format.")));
         }
 
         try {
-            userService.removeUser(name);
+            userService.removeUser(userId);
         } catch (InvalidUserException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new ApiResponse<>(null, new ApiError(e)));
@@ -231,14 +231,14 @@ public class UserController {
             )
     })
     @GetMapping("/get")
-    public ResponseEntity<ApiResponse<CustomPage<String>>> getUsersPage(
+    public ResponseEntity<ApiResponse<CustomPage<User>>> getUsersPage(
             @Parameter(description = "Page number", example = "1")
             @RequestParam(required = false, defaultValue = "1") int page,
             @Parameter(description = "Page size", example = "10")
             @RequestParam(required = false, defaultValue = "10") int size) {
 
        try {
-           CustomPage<String> allUsers = userService.getAllUsers(page, size);
+           CustomPage<User> allUsers = userService.getAllUsers(page, size);
            return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>(allUsers));
        } catch (IllegalArgumentException e) {
            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(null, new ApiError(e)));

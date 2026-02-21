@@ -119,7 +119,7 @@ public class OpenApiExamplesConstants {
                             "priority": "P1",
                             "start_time": "2007-12-03",
                             "deadline": "2008-12-03",
-                            "repeat_time": "2009-12-03"
+                            "repeat_time": "2009-12-03",
                             "assignees": [
                                 "Any"
                             ],
@@ -133,7 +133,7 @@ public class OpenApiExamplesConstants {
                             "priority": "P2",
                             "start_time": "2007-12-03",
                             "deadline": "2007-12-31",
-                            "repeat_time": ""
+                            "repeat_time": "",
                             "assignees": [
                                 "Any"
                             ],

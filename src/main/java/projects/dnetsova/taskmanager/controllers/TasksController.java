@@ -81,7 +81,11 @@ public class TasksController {
             @RequestParam(required = false) Priority priority,
             @RequestParam(required = false) String title,
             @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deadline,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate completionDate,
             @RequestParam(required = false) Boolean isCompleted,
             @RequestParam(required = false) Set<String> assignees,
             @RequestParam(required = false) UUID parentTaskId,
@@ -94,7 +98,9 @@ public class TasksController {
                     parentTaskId,
                     priority,
                     title,
+                    startDate,
                     deadline,
+                    completionDate,
                     isCompleted,
                     assignees == null ? Collections.emptySet(): assignees,
                     page,
