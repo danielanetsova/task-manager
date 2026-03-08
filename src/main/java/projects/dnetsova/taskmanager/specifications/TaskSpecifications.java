@@ -35,8 +35,7 @@ public final class TaskSpecifications {
         if (date == null) {
             return (root, query, cb) ->
                     cb.or(
-                            cb.lessThanOrEqualTo(root.get("startDate"), LocalDate.now()),
-                            cb.isNull(root.get("startDate"))
+                            cb.lessThanOrEqualTo(root.get("startDate"), LocalDate.now())
                     );
         }
         return (root, query, cb) -> {
@@ -55,6 +54,10 @@ public final class TaskSpecifications {
         if (deadline == null) return null;
         return (root, query, cb) ->
                 cb.greaterThanOrEqualTo(root.get("deadline"), deadline);
+    }
+
+    public static Specification<Task> deadlineIsNotNull() {
+        return (root, query, cb) -> cb.isNotNull(root.get("deadline"));
     }
 
     public static Specification<Task> completionDate(LocalDate completionDate) {

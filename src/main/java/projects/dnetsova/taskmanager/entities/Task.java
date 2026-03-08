@@ -2,6 +2,7 @@ package projects.dnetsova.taskmanager.entities;
 
 import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -14,9 +15,11 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Formula;
+import projects.dnetsova.taskmanager.converter.PeriodStringConverter;
 import projects.dnetsova.taskmanager.utils.Priority;
 
 import java.time.LocalDate;
+import java.time.Period;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,6 +48,10 @@ public class Task {
 
     @Column(name = "repeat_date")
     private LocalDate repeatDate;
+
+    @Convert(converter = PeriodStringConverter.class)
+    @Column(name = "repeat_period")
+    private Period repeatPeriod;
 
     @Column(name = "completion_date")
     private LocalDate completionDate;
@@ -80,17 +87,22 @@ public class Task {
     @Column(name = "parent_task_id")
     private UUID parentTaskId;
 
+    /** ID of the clone created from this task (populated for parent tasks only). */
+    @Column(name = "clone_task_id")
+    private UUID cloneTaskId;
+
     @Column(name = "is_completed")
     private boolean isCompleted;
 
     public Task(String title, String description, Priority priority, LocalDate startTime, LocalDate deadline,
-                LocalDate repeat, Set<User> assignees, UUID parentTaskId, boolean isCompleted) {
+                LocalDate repeat, Period repeatPeriod, Set<User> assignees, UUID parentTaskId, boolean isCompleted) {
         this.title = title;
         this.description = description;
         this.priority = priority;
         this.startDate = startTime;
         this.deadline = deadline;
         this.repeatDate = repeat;
+        this.repeatPeriod = repeatPeriod;
         this.assignees = assignees;
         this.parentTaskId = parentTaskId;
         this.isCompleted = isCompleted;
@@ -148,6 +160,14 @@ public class Task {
         this.repeatDate = repeatDate;
     }
 
+    public Period getRepeatPeriod() {
+        return repeatPeriod;
+    }
+
+    public void setRepeatPeriod(Period repeatPeriod) {
+        this.repeatPeriod = repeatPeriod;
+    }
+
     public LocalDate getCompletionDate() { return completionDate; }
 
     public void setCompletionDate(LocalDate completionDate) { this.completionDate = completionDate; }
@@ -174,6 +194,14 @@ public class Task {
 
     public void setParentTaskId(UUID parentTaskId) {
         this.parentTaskId = parentTaskId;
+    }
+
+    public UUID getCloneTaskId() {
+        return cloneTaskId;
+    }
+
+    public void setCloneTaskId(UUID cloneTaskId) {
+        this.cloneTaskId = cloneTaskId;
     }
 
     public boolean isCompleted() {

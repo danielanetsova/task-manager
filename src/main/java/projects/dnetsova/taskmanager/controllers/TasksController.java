@@ -175,6 +175,49 @@ public class TasksController {
         }
     }
 
+    @Operation(summary = "Complete task",
+            description = "Marks the task with the given ID as completed. If the task is already completed, no change is made. " +
+                    "When disableRepeat is true, no clone task is created even if the task has repeatDate or repeatPeriod.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+                    description = "Task completed or was already completed."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
+                    description = "Task not found.")
+    })
+    @PatchMapping("/{id}/complete")
+    public ResponseEntity<ApiResponse<Void>> completeTask(
+            @Parameter(description = "The ID of the task to mark as complete") @PathVariable UUID id,
+            @Parameter(description = "If true, do not create a clone task even when the task has repeatDate or repeatPeriod")
+            @RequestParam(required = false, defaultValue = "false") Boolean disableRepeat
+    ) {
+        try {
+            taskService.completeTask(id, disableRepeat);
+            return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>(null));
+        } catch (java.util.NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>(null, new ApiError(e)));
+        }
+    }
+
+    @Operation(summary = "Revert task",
+            description = "Marks the task as not completed. If the task has a clone (cloneTaskId), the clone and all its child tasks are deleted.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+                    description = "Task reverted successfully."),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
+                    description = "Task not found.")
+    })
+    @PatchMapping("/{id}/revert")
+    public ResponseEntity<ApiResponse<Void>> revertTask(
+            @Parameter(description = "The ID of the task to revert") @PathVariable UUID id
+    ) {
+        try {
+            taskService.revertTask(id);
+            return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>(null));
+        } catch (java.util.NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>(null, new ApiError(e)));
+        }
+    }
+
     @Operation(summary = "Delete task", description = "A task with the given ID is deleted.")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",

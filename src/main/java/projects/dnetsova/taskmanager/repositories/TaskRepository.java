@@ -13,10 +13,13 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import projects.dnetsova.taskmanager.entities.Task;
 
+import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificationExecutor<Task> {
+
+    List<Task> findByParentTaskId(UUID parentTaskId);
 
     // Avoid N+1 when you return tasks and later serialize assignees
     @EntityGraph(attributePaths = "assignees")

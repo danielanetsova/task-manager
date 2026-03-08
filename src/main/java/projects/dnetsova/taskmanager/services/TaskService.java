@@ -9,6 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import projects.dnetsova.taskmanager.models.CustomPage;
+import projects.dnetsova.taskmanager.models.RepeatPeriod;
 import projects.dnetsova.taskmanager.models.Task;
 import projects.dnetsova.taskmanager.models.TaskUpdate;
 import projects.dnetsova.taskmanager.repositories.TaskRepository;
@@ -26,12 +27,14 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.completionDate;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.deadlineIsNotNull;
 import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.deadlineLte;
 import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.hasAllAssigneesByName;
 import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.isCompleted;
 import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.parentTaskIdEq;
 import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.priority;
 import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.startDate;
+import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.startDateLte;
 import static projects.dnetsova.taskmanager.specifications.TaskSpecifications.titleContainsIgnoreCase;
 
 @Service
@@ -49,10 +52,11 @@ public class TaskService {
         projects.dnetsova.taskmanager.entities.Task taskEntity = new projects.dnetsova.taskmanager.entities.Task(
                 task.title(),
                 task.description(),
-                Priority.valueOf(task.priority()),
-                task.start(),
+                task.priority(),
+                task.start() == null ? LocalDate.now() : task.start(),
                 task.deadline(),
                 task.repeat(),
+                task.repeatPeriod() == null ? null : task.repeatPeriod().toPeriod(),
                 new HashSet<>(this.userRepository.findByNameIn(task.assignees())),
                 task.parentTaskId(),
                 task.isCompleted()
@@ -68,10 +72,11 @@ public class TaskService {
                 entity.getId(),
                 entity.getTitle(),
                 entity.getDescription(),
-                entity.getPriority().toString(),
+                entity.getPriority(),
                 entity.getStartDate(),
                 entity.getDeadline(),
                 entity.getRepeatDate(),
+                entity.getRepeatPeriod() != null ? RepeatPeriod.fromPeriod(entity.getRepeatPeriod()) : null,
                 entity.getCompletionDate(),
                 entity.getAssignees().stream().map(a -> a.getName()).toList(),
                 entity.getParentTaskId(),
@@ -96,7 +101,9 @@ public class TaskService {
                 .and(isCompleted(isCompleted))
                 .and(priority(priority))
                 .and(titleContainsIgnoreCase(title))
-                .and(isCompleted != null && isCompleted ? null : startDate(startDate))
+                .and(
+                        (isCompleted != null && isCompleted) || (parentTaskId != null && startDate == null) ?
+                                null : startDate(startDate))
                 .and(deadlineLte(deadline))
                 .and(completionDate(completionDate))
                 .and(parentTaskIdEq(parentTaskId))
@@ -137,8 +144,8 @@ public class TaskService {
 
     @Transactional
     public void updateTask(UUID id, TaskUpdate taskUpdate) {
-        if (taskUpdate.getTitle() == null || taskUpdate.getPriority() == null || taskUpdate.getIsCompleted() == null) {
-            throw new IllegalArgumentException("Title, priority and isCompleted cannot be set to null or empty");
+        if (taskUpdate.getTitle() == null || taskUpdate.getPriority() == null) {
+            throw new IllegalArgumentException("Title and priority cannot be set to null or empty");
         }
 
         projects.dnetsova.taskmanager.entities.Task entity = taskRepository.findById(id)
@@ -170,14 +177,121 @@ public class TaskService {
             entity.setAssignees(new HashSet<>(userRepository.findByNameIn(taskUpdate.getAssignees().get())));
         }
 
-        applyUpdate(taskUpdate.getIsCompleted(),
-                entity::setCompleted);
+        taskRepository.saveAndFlush(entity);
+    }
 
-        if (taskUpdate.getIsCompleted().isPresent() && taskUpdate.getIsCompleted().get()) {
-            entity.setCompletionDate(LocalDate.now());
+    @Transactional
+    public void completeTask(UUID id, boolean disableRepeat) {
+        projects.dnetsova.taskmanager.entities.Task entity = taskRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Task not found: " + id));
+
+        if (!entity.isCompleted()) {
+            LocalDate completionDate = LocalDate.now();
+            entity.setCompleted(true);
+            entity.setCompletionDate(completionDate);
+            taskRepository.saveAndFlush(entity);
+
+            if (!disableRepeat && entity.getParentTaskId() == null) {
+                // Create a new recurring task if repeat information is present
+                LocalDate newStartDate = null;
+                if (entity.getRepeatDate() != null) {
+                    newStartDate = entity.getRepeatDate();
+                } else if (entity.getRepeatPeriod() != null) {
+                    newStartDate = completionDate.plus(entity.getRepeatPeriod());
+                }
+
+                if (newStartDate != null) {
+                    LocalDate newDeadline = null;
+                    if (entity.getDeadline() != null) {
+                        // Preserve the same offset between start and deadline
+                        java.time.Period offset = java.time.Period.between(entity.getStartDate(), entity.getDeadline());
+                        newDeadline = newStartDate.plus(offset);
+                    }
+
+                    // If repeatDate was set, new task's repeatDate is same date next year (Feb 29 -> Feb 28 in non-leap years)
+                    LocalDate newRepeatDate = entity.getRepeatDate() != null
+                            ? entity.getRepeatDate().plusYears(1)
+                            : null;
+
+                    projects.dnetsova.taskmanager.entities.Task newTask =
+                            new projects.dnetsova.taskmanager.entities.Task(
+                                    entity.getTitle(),
+                                    entity.getDescription(),
+                                    entity.getPriority(),
+                                    newStartDate,
+                                    newDeadline,
+                                    newRepeatDate,
+                                    entity.getRepeatPeriod(),
+                                    // Use a new Set instance to avoid sharing the same collection reference
+                                    new java.util.HashSet<>(entity.getAssignees()),
+                                    entity.getParentTaskId(),
+                                    false
+                            );
+
+                    taskRepository.saveAndFlush(newTask);
+
+                    // Set cloneTaskId on the original parent task to reference the new clone
+                    entity.setCloneTaskId(newTask.getId());
+                    taskRepository.saveAndFlush(entity);
+
+                    // Clone all subtasks of the completed task as subtasks of the new task
+                    List<projects.dnetsova.taskmanager.entities.Task> children =
+                            taskRepository.findByParentTaskId(entity.getId());
+                    for (projects.dnetsova.taskmanager.entities.Task child : children) {
+                        LocalDate subDeadline = null;
+                        if (child.getDeadline() != null) {
+                            java.time.Period offset =
+                                    java.time.Period.between(child.getStartDate(), child.getDeadline());
+                            subDeadline = newStartDate.plus(offset);
+                        }
+                        projects.dnetsova.taskmanager.entities.Task clonedSubtask =
+                                new projects.dnetsova.taskmanager.entities.Task(
+                                        child.getTitle(),
+                                        child.getDescription(),
+                                        child.getPriority(),
+                                        newStartDate,
+                                        subDeadline,
+                                        child.getRepeatDate(),
+                                        child.getRepeatPeriod(),
+                                        new HashSet<>(child.getAssignees()),
+                                        newTask.getId(),
+                                        false
+                                );
+                        taskRepository.saveAndFlush(clonedSubtask);
+                    }
+                }
+            }
         }
+    }
+
+    @Transactional
+    public void revertTask(UUID id) {
+        projects.dnetsova.taskmanager.entities.Task entity = taskRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Task not found: " + id));
+
+        entity.setCompleted(false);
+        entity.setCompletionDate(null);
+
+        UUID cloneId = entity.getCloneTaskId();
+        if (cloneId != null) {
+            taskRepository.deleteTaskAndDirectChildren(cloneId);
+        }
+        entity.setCloneTaskId(null);
 
         taskRepository.saveAndFlush(entity);
+    }
+
+    /**
+     * Retrieves all tasks with deadline != null, startDate &gt;= today, and isCompleted = false.
+     */
+    public Page<projects.dnetsova.taskmanager.entities.Task> getActiveTasksWithDeadline(int page, int size) {
+        Specification<projects.dnetsova.taskmanager.entities.Task> spec = Specification
+                .<projects.dnetsova.taskmanager.entities.Task>where(null)
+                .and(isCompleted(false))
+                .and(deadlineIsNotNull())
+                .and(startDateLte(LocalDate.now()));
+
+        return taskRepository.findAll(spec, PageRequest.of(page, size));
     }
 
     private <T> void applyUpdate(Optional<T> updateValue,
@@ -194,10 +308,11 @@ public class TaskService {
                 te.getId(),
                 te.getTitle(),
                 te.getDescription(),
-                te.getPriority().toString(),
+                te.getPriority(),
                 te.getStartDate(),
                 te.getDeadline(),
                 te.getRepeatDate(),
+                te.getRepeatPeriod() != null ? RepeatPeriod.fromPeriod(te.getRepeatPeriod()) : null,
                 te.getCompletionDate(),
                 te.getAssignees().stream().map(a -> a.getName()).toList(),
                 te.getParentTaskId(),
